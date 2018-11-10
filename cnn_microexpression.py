@@ -94,3 +94,8 @@ while k < 68:
         sess.run(init_op)
     
 f2.close()
+#since anaconda is used, first open its cmd, then:
+# $activate tensorflow
+# $cd ...
+# $tensorboard --logdir=...
+#then get tensorboard result
