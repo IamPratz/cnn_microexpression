@@ -11,7 +11,7 @@ import numpy as np
 #import matplotlib.pyplot as plt
 import pickle
 
-with open('e:/zhanghz/documents/xmum/Christys_project/readLOSO_3db_28.pkl','rb') as f: 
+with open('e:/path/to/files/readLOSO_3db_28.pkl','rb') as f: 
 	X_train_N, y_train_N, X_test_N, y_test_N = pickle.load(f)
 
 with tf.name_scope('inputs'):
@@ -68,7 +68,7 @@ sess.run(init_op)     # initialize var in graph
 writer = tf.summary.FileWriter('./log', sess.graph)
 merge_op = tf.summary.merge_all()
 
-f2 = open('e:/zhanghz/documents/xmum/Christys_project/train_output.txt', 'a')
+f2 = open('e:/path/to/output/train_output.txt', 'a')
 
 k=67
 step=0
