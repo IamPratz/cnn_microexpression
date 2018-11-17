@@ -6,23 +6,35 @@ Created on Tue Oct 30 19:44:54 2018
 """
 
 import tensorflow as tf
+# this is mnist sample data, which will not be used here
 #from tensorflow.examples.tutorials.mnist import input_data
-import numpy as np
+
+# this is to import some packages that might be useful
+#import numpy as np
 #import matplotlib.pyplot as plt
+
+# the package for input images
 import pickle
 
+# open input images
 with open('e:/path/to/files/readLOSO_3db_28.pkl','rb') as f: 
 	X_train_N, y_train_N, X_test_N, y_test_N = pickle.load(f)
 
+# set placeholders to hold the tensors that will be passed to the cnn as INPUTS
 with tf.name_scope('inputs'):
-    tf_x = tf.placeholder(tf.float32, [None, 28,28,1])
-    tf_y = tf.placeholder(tf.int32, [None, 3])            # input y
+    tf_x = tf.placeholder(tf.float32, [None, 28,28,1]) # the images
+    tf_y = tf.placeholder(tf.int32, [None, 3]) # the labels
 
+# reshape the input image to make them fit for cnn
+# can also show them on tensorboard
 with tf.name_scope('input_reshape'):
-    image = tf.reshape(tf_x, [-1, 28, 28, 1])              # (batch, height, width, channel)
-    tf.summary.image('input', image, 10)
+    image = tf.reshape(tf_x, [-1, 28, 28, 1])
+    # (batch, height, width, channel)
+    # visualization for input image
+    #tf.summary.image('input', image, 10)
 
 # CNN
+# first convolutional layer
 with tf.name_scope('conv1'):
     conv1 = tf.layers.conv2d(   # shape (28, 28, 1)
         inputs=image,
@@ -31,27 +43,59 @@ with tf.name_scope('conv1'):
         strides=1,
         padding='same',
         activation=tf.nn.relu
-    )           # -> (28, 28, 16)
-    
+	name='conv1'
+    )           # -> (28, 28, 32)
+
+'''kernel visualization'''    
+# get the kernels in the first convolutional network
+kernel1 = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, 'conv1/kernel')[0]
+#bias = tf.get_collection(tf.GraphKeys.VARIABLES, 'conv1/bias')[0]
+# switch the last dimension, which indicate the AMOUNT of kernels, to the front
+kernel1_t = tf.transpose(kernel1, [3,0,1,2]) 
+tf.summary.image('kernel1', kernel1_t, 32)   #show the kernels on tensorboard
+
+'''feature map 1 visualization'''
+output1_1 = tf.slice(conv1, (0, 0, 0, 0), (1, -1, -1, -1)) # get the first sample feature map
+output1_1 = tf.squeeze(output1_1) # reduce dimension
+output1_1 = tf.transpose(output1_1, (2,0,1)) # reshape
+output1_1 = tf.reshape(output1_1, [-1, 28, 28, 1]) # continue to reshape to make it fit for summary
+tf.summary.image('conv1', output1_1, 32) # create summary
+
+# first max pooling
 with tf.name_scope('pool1'):
     pool1 = tf.layers.max_pooling2d(
             conv1,
             pool_size=2,
             strides=2,
-    )           # -> (14, 14, 16)
+    )           # -> (14, 14, 32)
 
+# 2nd conv layer
 with tf.name_scope('conv2'):
-    conv2 = tf.layers.conv2d(pool1, 64, 5, 1, 'same', activation=tf.nn.relu)    # -> (14, 14, 32)
-with tf.name_scope('conv2'):
-    pool2 = tf.layers.max_pooling2d(conv2, 2, 2)    # -> (7, 7, 32)
+    conv2 = tf.layers.conv2d(pool1, 64, 5, 1, 'same', activation=tf.nn.relu, name='conv2')    # -> (14, 14, 64)
+
+'''feature map 2 visualization'''
+output2_1 = tf.slice(conv2, (0, 0, 0, 0), (1, -1, -1, -1))
+output2_1 = tf.squeeze(output2_1)
+output2_1 = tf.transpose(output2_1, (2,0,1))
+output2_1 = tf.reshape(output2_1, [-1, 14, 14, 1])
+tf.summary.image('conv1', output2_1, 64) 
+
+# 2nd max pooling
+with tf.name_scope('pool2'):
+    pool2 = tf.layers.max_pooling2d(conv2, 2, 2)    # -> (7, 7, 64)
+
+# fully connected layer at last
 with tf.name_scope('fc_layer'):
-    flat = tf.reshape(pool2, [-1, 7*7*64])          
-    output = tf.layers.dense(flat, 3) #final result, final weights/filters that determine the class of image    
+    flat = tf.reshape(pool2, [-1, 7*7*64]) # flat the tensor, with corresponding size values          
+    output = tf.layers.dense(flat, 3) # final result, final weights/filters that determine the class of image    
+# compute loss
 with tf.name_scope('losses'):
-    loss = tf.losses.softmax_cross_entropy(onehot_labels=tf_y, logits=output)           # compute cost
+    loss = tf.losses.softmax_cross_entropy(onehot_labels=tf_y, logits=output)
     tf.summary.scalar('loss', loss)
-    tf.summary.histogram('loss', loss)
+    #tf.summary.histogram('loss', loss)
+''' end of CNN structure '''
 
+''' training setup '''
 with tf.name_scope('train'):    
     train_op = tf.train.AdamOptimizer(0.0001).minimize(loss)
     
@@ -59,15 +103,21 @@ with tf.name_scope('accuracy'):
     accuracy = tf.metrics.accuracy(          # return (acc, update_op), and create 2 local variables
     labels=tf.argmax(tf_y, axis=1), predictions=tf.argmax(output, axis=1),)[1]
     tf.summary.scalar('accu', accuracy)
-    tf.summary.histogram('accu', accuracy)
+    #tf.summary.histogram('accu', accuracy)
 
 sess = tf.Session()
 init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer()) # the local var is for accuracy_op
 sess.run(init_op)     # initialize var in graph
 
+# setup for the summaries building
 writer = tf.summary.FileWriter('./log', sess.graph)
+# this step is to create the histogram for all trainable variables
+#for var in tf.trainable_variables():
+    #tf.summary.histogram(var.name, var)
 merge_op = tf.summary.merge_all()
 
+''' actual training stage '''
+# create a txt file to save progress
 f2 = open('e:/path/to/output/train_output.txt', 'a')
 
 k=67
@@ -76,8 +126,9 @@ while k < 68:
     b_x, b_y = X_train_N[k][0], y_train_N[k][0]
     #with tf.device("/cpu:0"): this is to use cpu instead
     _, loss_, result = sess.run([train_op, loss, merge_op], feed_dict={tf_x: b_x, tf_y: b_y}) #'_' means train_op does not have output and 'loss_' is the loss
-    writer.add_summary(result, step)
-    if step % 50 == 0:
+    
+    if step % 10 == 0:
+	writer.add_summary(result, step)
         if step == 0:
             print('', file = f2)
             print('result for X_train[',k,'][0]:', file = f2)
@@ -98,4 +149,4 @@ f2.close()
 # $activate tensorflow
 # $cd ...
 # $tensorboard --logdir=...
-#then get tensorboard result
+#then open the browser (chrome recommended) to get tensorboard result
