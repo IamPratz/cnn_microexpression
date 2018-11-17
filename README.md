@@ -5,4 +5,4 @@ It also implementes the visualization of the kernel and feature map on tensorboa
 Python 3.6.7\
 TensorFlow 1.2.1  
 # Input
-pickle file that contains 3 database samples, with details in "video441Names.txt" and "video441Labels.txt"  
+pickle file that contains three database samples, with details in "video441Names.txt" and "video441Labels.txt"  
