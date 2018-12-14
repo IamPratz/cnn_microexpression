@@ -7,5 +7,5 @@ TensorFlow 1.2.1
 # Input
 pickle file that contains three database samples, with details in "video441Names.txt" and "video441Labels.txt"  
 # Additional function
-The program implements the visualization for kernel and feature maps
-Record is also written on the tensorboard
+The program implements the visualization for kernel and feature maps.\
+Record is also written on the tensorboard.
