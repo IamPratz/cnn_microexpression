@@ -59,7 +59,8 @@ output1_1 = tf.slice(conv1, (0, 0, 0, 0), (1, -1, -1, -1)) # get the first sampl
 output1_1 = tf.squeeze(output1_1) # reduce dimension
 output1_1 = tf.transpose(output1_1, (2,0,1)) # reshape
 output1_1 = tf.reshape(output1_1, [-1, 28, 28, 1]) # continue to reshape to make it fit for summary
-tf.summary.image('conv1', output1_1, 32) # create summary
+# the image will be directly saved in a folder outside the cnn structure
+# tf.summary.image('conv1', output1_1, 32) # create summary
 
 # first max pooling
 with tf.name_scope('pool1'):
@@ -123,19 +124,45 @@ f2 = open('e:/path/to/output/train_output.txt', 'a')
 k=67
 step=0
 while k < 68:
-    b_x, b_y = X_train_N[k][0], y_train_N[k][0]
-    #with tf.device("/cpu:0"): this is to use cpu instead
-    _, loss_, result = sess.run([train_op, loss, merge_op], feed_dict={tf_x: b_x, tf_y: b_y}) #'_' means train_op does not have output and 'loss_' is the loss
+    sess.run(init_op)
+    u_x, u_y = X_train_N[k][0], y_train_N[k][0]
+    v_x, v_y = X_train_N[k][1], y_train_N[k][1]
+    # with tf.device("/cpu:0"): this is to use cpu instead
+    # train both u and v optical flow pics
+    _, loss_u, result_u, tensor_u1, tensor_u2 = sess.run([train_op, loss, merge_op, output1_1, output2_1],
+        feed_dict={tf_x: u_x, tf_y: u_y}) #'_' means train_op does not have output and 'loss_' is the loss
     
+    _, loss_v, result_v, tensor_v1, tensor_v2 = sess.run([train_op, loss, merge_op, output1_1, output2_1],
+        feed_dict={tf_x: v_x, tf_y: v_y})
+    
+    merge_tensor1 = sess.run(tf.add(tensor_u1, tensor_v1))
+    merge_tensor2 = sess.run(tf.add(tensor_u2, tensor_v2))
+    # save all uvfeature pics in both conv1 and conv2
+    # this step has cost too much memory, not recommended to carry out all of them
+    if step == 0 or step == 300 or step == 600:
+        for i in range(32):
+            plt.imsave("./npics/conv1/uv/set_%s_step%s_uv_feature%s.png" % (k, step, i), merge_tensor1[i].reshape(28,28))
+            plt.imsave("./npics/conv1/u/set_%s_step%s_u_feature%s.png" % (k, step, i), tensor_u1[i].reshape(28,28))
+            plt.imsave("./npics/conv1/v/set_%s_step%s_u_feature%s.png" % (k, step, i), tensor_v1[i].reshape(28,28))
+            plt.imsave("./npics/conv2/uv/set_%s_step%s_uv_feature%s.png" % (k, step, i), merge_tensor2[i].reshape(14,14))
+            plt.imsave("./npics/conv2/u/set_%s_step%s_u_feature%s.png" % (k, step, i), tensor_u2[i].reshape(14,14))
+            plt.imsave("./npics/conv2/v/set_%s_step%s_u_feature%s.png" % (k, step, i), tensor_v2[i].reshape(14,14))
+
     if step % 10 == 0:
-	writer.add_summary(result, step)
+        writer.add_summary(result_u, step) #add things on tensorboard
+        
         if step == 0:
             print('', file = f2)
-            print('result for X_train[',k,'][0]:', file = f2)
-            print('result for X_train[',k,'][0]:')
-        accuracy_, flat_representation = sess.run([accuracy, flat], {tf_x: X_test_N[k][0], tf_y: y_test_N[k][0]})
-        print('Step:', step, '| train loss: %.4f' % loss_, '| test accuracy: %.2f' % accuracy_, file = f2)
-        print('Step:', step, '| train loss: %.4f' % loss_, '| test accuracy: %.2f' % accuracy_)
+            print('result for X_train[',k,'][ 0 ]:', file = f2)
+            print('result for X_train[',k,'][ 0 ]:')
+        accuracy_u, flat_u = sess.run([accuracy, flat], {tf_x: X_test_N[k][0], tf_y: y_test_N[k][0]})
+        accuracy_v, flat_v = sess.run([accuracy, flat], {tf_x: X_test_N[k][1], tf_y: y_test_N[k][1]})
+	# record both u and v training progress
+        print('Step:', step, '| train loss: %.4f' % loss_u, '| test accuracy: %.2f' % accuracy_u, file = f2)
+        print('Step:', step, '| train loss: %.4f' % loss_u, '| test accuracy: %.2f' % accuracy_u)
+        
+        print('Step:', step, '| train loss: %.4f' % loss_v, '| test accuracy: %.2f' % accuracy_v, file = f2)
+        print('Step:', step, '| train loss: %.4f' % loss_v, '| test accuracy: %.2f' % accuracy_v)
         
     step = step + 1
     
